@@ -102,8 +102,48 @@ if uploaded_files:
                     # --- Interface: Tabs ---
                     with st.expander(f"👁️ Preview Content: {base_name}", expanded=True):
                         
-                        # Added new tab here
+                        # Tabs for Rendered View, Raw Text, and Stats
                         tab1, tab2, tab3 = st.tabs(["Rendered View", "Raw Text", "📊 File Size Comparison"])
                         
                         with tab1:
-                            st.
+                            st.markdown(output_text)
+                        
+                        with tab2:
+                            st.text_area("Copy content", output_text, height=200)
+                            
+                        with tab3:
+                            # Display Size Comparison Metrics
+                            col_a, col_b = st.columns(2)
+                            col_a.metric("Original Size", original_fmt)
+                            col_b.metric("Text Size", converted_fmt, delta=f"-{reduction_pct:.1f}% reduction")
+                            
+                            st.divider()
+                            st.markdown(f"**Efficiency:** Text version is **{reduction_pct:.1f}% smaller** than the original.")
+                            
+                            # Clean Table
+                            st.table({
+                                "Metric": ["Original File Size", "Converted Text Size"],
+                                "Value": [original_fmt, converted_fmt]
+                            })
+
+                        st.divider()
+                        
+                        # Download Buttons
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.download_button(
+                                label="📥 Download .md",
+                                data=output_text,
+                                file_name=f"{output_name}.md",
+                                mime="text/markdown"
+                            )
+                        with col2:
+                            st.download_button(
+                                label="📥 Download .txt",
+                                data=output_text,
+                                file_name=f"{output_name}.txt",
+                                mime="text/plain"
+                            )
+
+st.divider()
+st.caption("Powered by Microsoft MarkItDown")
