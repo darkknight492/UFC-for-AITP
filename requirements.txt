@@ -1,0 +1,6 @@
+streamlit
+markitdown
+openai
+# Note: 'openai' is an optional dependency for MarkItDown to describe images, 
+# but strictly for text conversion, the base package often suffices. 
+# Including it ensures full compatibility if you expand features later.
