@@ -32,28 +32,34 @@ def save_uploaded_file(uploaded_file):
             tmp_file.write(uploaded_file.getvalue())
             return tmp_file.name
     except Exception as e:
-        st.error(f"Error handling file system: {e}")
+        st.error(f"System Error: Could not save file to disk. Details: {e}")
         return None
 
 def convert_file(file_path):
     """
-    Orchestrates the conversion using MarkItDown.
-    Includes basic error handling logic.
+    Orchestrates the conversion.
+    Returns: (Boolean Success, String Result/Error)
     """
     try:
         # The primary engine call
         result = md_engine.convert(file_path)
-        return result.text_content
+        
+        # Check if result is empty or None
+        if result is None or result.text_content is None:
+             return False, "The converter returned no text. The file might be empty or image-only."
+             
+        return True, result.text_content
+        
     except Exception as e:
-        # Return None to signal failure to the UI
-        return None
+        # We capture the exact error message here to show the user
+        return False, str(e)
 
 # --- Main Interface ---
 
 st.title("📄 Universal File-to-Markdown")
 st.markdown(
     """
-    Convert your documents (**Word, Excel, PowerPoint, PDF, HTML**) into clean, portable Markdown text.
+    Convert **Word, Excel, PowerPoint, PDF, and HTML** into clean text.
     """
 )
 
@@ -61,7 +67,8 @@ st.markdown(
 uploaded_files = st.file_uploader(
     "Drag and drop files here", 
     accept_multiple_files=True,
-    type=['docx', 'xlsx', 'pptx', 'pdf', 'html', 'htm']
+    # We allow all likely extensions
+    type=['docx', 'xlsx', 'pptx', 'pdf', 'html', 'htm', 'csv', 'txt']
 )
 
 if uploaded_files:
@@ -69,22 +76,27 @@ if uploaded_files:
     st.subheader("Processing Queue")
 
     for uploaded_file in uploaded_files:
-        with st.status(f"Converting **{uploaded_file.name}**...", expanded=False) as status:
+        # Create a collapsible status container
+        with st.status(f"Processing **{uploaded_file.name}**...", expanded=False) as status:
             
             # 1. Save to temp file
             temp_path = save_uploaded_file(uploaded_file)
             
             if temp_path:
-                # 2. Perform Conversion
-                converted_text = convert_file(temp_path)
+                # 2. Perform Conversion with Error Catching
+                success, output_text = convert_file(temp_path)
                 
-                # 3. Clean up temp file
-                os.remove(temp_path)
+                # 3. Clean up temp file immediately
+                try:
+                    os.remove(temp_path)
+                except:
+                    pass # Non-critical error if delete fails
 
-                # [3] Resilience: Check if conversion was successful
-                if converted_text is None:
+                # [3] Resilience: Check success
+                if not success:
                     status.update(label=f"❌ Failed: {uploaded_file.name}", state="error")
-                    st.error(f"⚠️ Could not read {uploaded_file.name}. Please check the format.")
+                    st.error(f"⚠️ **Error Details:** {output_text}")
+                    st.caption("Tip: If the error says 'ModuleNotFoundError', check your requirements.txt.")
                 else:
                     status.update(label=f"✅ Ready: {uploaded_file.name}", state="complete")
                     
@@ -92,33 +104,35 @@ if uploaded_files:
                     base_name = os.path.splitext(uploaded_file.name)[0]
                     output_name = f"{base_name}_converted"
                     
-                    # [2] The Interface: Instant Preview
-                    with st.expander(f"👁️ Preview: {base_name}"):
-                        st.markdown(converted_text) # Rendered Markdown
+                    # [2] The Interface: Instant Preview & Download
+                    with st.expander(f"👁️ Preview Content: {base_name}", expanded=True):
+                        
+                        # Tabs for Markdown vs Raw Text
+                        tab1, tab2 = st.tabs(["Rendered View", "Raw Text"])
+                        with tab1:
+                            st.markdown(output_text)
+                        with tab2:
+                            st.text_area("Copy content", output_text, height=200)
+
                         st.divider()
-                        st.text_area("Raw Text Source", converted_text, height=200)
+                        
+                        # Download Buttons
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.download_button(
+                                label="📥 Download as Markdown (.md)",
+                                data=output_text,
+                                file_name=f"{output_name}.md",
+                                mime="text/markdown"
+                            )
+                        with col2:
+                            st.download_button(
+                                label="📥 Download as Text (.txt)",
+                                data=output_text,
+                                file_name=f"{output_name}.txt",
+                                mime="text/plain"
+                            )
 
-                    # [2] The Interface: Download Options
-                    col1, col2 = st.columns(2)
-                    
-                    with col1:
-                        st.download_button(
-                            label="📥 Download .md",
-                            data=converted_text,
-                            file_name=f"{output_name}.md",
-                            mime="text/markdown"
-                        )
-                    
-                    with col2:
-                        st.download_button(
-                            label="📥 Download .txt",
-                            data=converted_text,
-                            file_name=f"{output_name}.txt",
-                            mime="text/plain"
-                        )
-            else:
-                 st.error("System error: Could not save temporary file.")
-
-# Footer / Instructions
+# Footer
 st.divider()
-st.caption("Powered by Microsoft MarkItDown & Streamlit")
+st.caption("Powered by Microsoft MarkItDown")
